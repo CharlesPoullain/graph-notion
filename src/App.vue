@@ -1,6 +1,7 @@
 <script setup>
 import { ref } from 'vue'
 import GraphViewExemple from './components/GraphViewExemple.vue'
+import GraphView from './components/GraphView.vue'
 const isExemple = ref(false)
 </script>
 
