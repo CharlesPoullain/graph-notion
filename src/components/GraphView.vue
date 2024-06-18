@@ -4,108 +4,93 @@ import * as d3 from 'd3'
 
 const graph = ref(null)
 
-const nodes = [
-  { id: 'dd705aa8-2eca-4c74-bb0a-7f50447269f1', title: 'State Machine' },
-  { id: 'af4d9ed4-d909-42e2-b22d-eb1e44d93f33', title: 'Vue 3 - Fragments' },
-  { id: '8b2c7b6f-b08d-4fc3-9f78-6664c304d980', title: 'Vue 3 - Provide/Inject' },
-  { id: 'e5c7ba7f-3db9-49b8-bfd3-61fd2f75916a', title: 'Vue 3 - Reactivity' },
-  { id: 'a011fd79-5271-4394-a857-459e9cf66b16', title: 'Vue 3 - Suspense' },
-  { id: '46856c57-b42c-48f0-b230-f5087a087a63', title: 'Vue 3 - Teleport' },
-  { id: '865ab0ae-9d0a-4432-95c7-10c60b57ba91', title: 'Vue3' }
-]
+// import FetchPosts from '../services/FetchPosts.js'
+// const data = FetchPosts.execute()
+import data from '../posts.json'
+const nodes = data?.results?.map(page => ({
+  id: page.id,
+  title: page.properties.Name.title[0].plain_text
+}))
 
-const links = [
-  {
-    source: 'af4d9ed4-d909-42e2-b22d-eb1e44d93f33',
-    target: '865ab0ae-9d0a-4432-95c7-10c60b57ba91'
-  },
-  {
-    source: '8b2c7b6f-b08d-4fc3-9f78-6664c304d980',
-    target: '865ab0ae-9d0a-4432-95c7-10c60b57ba91'
-  },
-  {
-    source: 'e5c7ba7f-3db9-49b8-bfd3-61fd2f75916a',
-    target: '865ab0ae-9d0a-4432-95c7-10c60b57ba91'
-  },
-  {
-    source: 'a011fd79-5271-4394-a857-459e9cf66b16',
-    target: '865ab0ae-9d0a-4432-95c7-10c60b57ba91'
-  },
-  {
-    source: '46856c57-b42c-48f0-b230-f5087a087a63',
-    target: '865ab0ae-9d0a-4432-95c7-10c60b57ba91'
-  },
-  {
-    source: '865ab0ae-9d0a-4432-95c7-10c60b57ba91',
-    target: 'af4d9ed4-d909-42e2-b22d-eb1e44d93f33'
-  },
-  {
-    source: '865ab0ae-9d0a-4432-95c7-10c60b57ba91',
-    target: 'a011fd79-5271-4394-a857-459e9cf66b16'
-  },
-  {
-    source: '865ab0ae-9d0a-4432-95c7-10c60b57ba91',
-    target: '46856c57-b42c-48f0-b230-f5087a087a63'
-  },
-  {
-    source: '865ab0ae-9d0a-4432-95c7-10c60b57ba91',
-    target: 'e5c7ba7f-3db9-49b8-bfd3-61fd2f75916a'
-  },
-  { source: '865ab0ae-9d0a-4432-95c7-10c60b57ba91', target: '8b2c7b6f-b08d-4fc3-9f78-6664c304d980' }
-]
+const links = []
+
+data?.results?.forEach(page => {
+  const sourceId = page.id
+  const related = page.properties['Related base test'].relation
+  related.forEach(relation => {
+    links.push({
+      source: sourceId,
+      target: relation.id
+    })
+  })
+})
+
+// Pour garantir des liens réciproques
+data?.results?.forEach(page => {
+  const targetId = page.id
+  const relatedBack = page.properties['Related back to base test'].relation
+  relatedBack.forEach(relation => {
+    links.push({
+      source: relation.id,
+      target: targetId
+    })
+  })
+})
 
 const createGraph = () => {
   const width = 800
   const height = 600
-  const svg = d3.select(graph.value).append("svg").attr("width", width).attr("height", height)
+  // Specify the color scale.
+  const color = d3.scaleOrdinal(d3.schemeCategory10)
 
+  // The force simulation mutates links and nodes, so create a copy
+  // so that re-evaluating this cell produces the same result.
+
+  // Create a simulation with several forces.
   const simulation = d3
   .forceSimulation(nodes)
   .force(
     'link',
-    d3
-      .forceLink(links)
-      .id((d) => d.id)
-      .distance(100)
+    d3.forceLink(links).id((d) => d.id).distance(100)
   )
   .force('charge', d3.forceManyBody().strength(-300))
-  .force('center', d3.forceCenter(width / 2, height / 2))
+  .force('center', d3.forceCenter(0, 0))
+  .force('collision', d3.forceCollide().radius(50))
+  .force('x', d3.forceX(0).strength(0.1)) 
+  .force('y', d3.forceY(0).strength(0.1))
 
+  // Create the SVG container.
+  const svg = d3
+    .select(graph.value)
+    .append('svg')
+    .attr('width', width)
+    .attr('height', height)
+    .attr('viewBox', [-width / 2, -height / 2, width, height])
+    .attr('style', 'max-width: 100%; height: auto;')
+
+  // Add a line for each link, and a circle for each node.
   const link = svg
-  .append('g')
-  .selectAll('line')
-  .data(links)
-  .enter()
-  .append('line')
-  .attr('stroke-width', 2)
-  .attr('stroke', '#7776B3')
+    .append('g')
+    .attr('stroke', '#999')
+    .attr('stroke-opacity', 0.4)
+    .selectAll('line')
+    .data(links)
+    .join('line')
+    .attr('stroke-width', (d) => Math.sqrt(d.value))
 
   const node = svg
-  .append('g')
-  .selectAll('circle')
-  .data(nodes)
-  .enter()
-  .append('circle')
-  .attr('r', 10)
-  .attr('fill', '#5A639C')
-  .call(
-    d3
-      .drag()
-      .on('start', (event, d) => {
-        if (!event.active) simulation.alphaTarget(0.3).restart()
-        d.fx = event.x
-        d.fy = event.y
-      })
-      .on('drag', (event, d) => {
-        d.fx = event.x
-        d.fy = event.y
-      })
-      .on('end', (event, d) => {
-        if (!event.active) simulation.alphaTarget(0)
-        d.fx = null
-        d.fy = null
-      })
-  )
+    .append('g')
+    .attr('stroke', '#fff')
+    .attr('stroke-width', 1.5)
+    .selectAll('circle')
+    .data(nodes)
+    .join('circle')
+    .attr('r', 10)
+    .attr('fill', (d) => color(d.group))
+    .attr('cursor', 'pointer')
+
+  node.append('title').text((d) => d.id)
+
   const label = svg
   .append('g')
   .selectAll('text')
@@ -114,8 +99,14 @@ const createGraph = () => {
   .append('text')
   .attr('dy', -3)
   .attr('dx', 12)
+  .attr('cursor', 'default')
   .text((d) => d.title)
 
+
+  // Add a drag behavior.
+  node.call(d3.drag().on('start', dragstarted).on('drag', dragged).on('end', dragended))
+
+  // Set the position attributes of links and nodes each time the simulation ticks.
   simulation.on('tick', () => {
     link
       .attr('x1', (d) => d.source.x)
@@ -126,6 +117,32 @@ const createGraph = () => {
     node.attr('cx', (d) => d.x).attr('cy', (d) => d.y)
     label.attr('x', (d) => d.x).attr('y', (d) => d.y)
   })
+
+  // Reheat the simulation when drag starts, and fix the subject position.
+  function dragstarted(event) {
+    if (!event.active) simulation.alphaTarget(0.3).restart()
+    event.subject.fx = event.subject.x
+    event.subject.fy = event.subject.y
+  }
+
+  // Update the subject (dragged node) position during drag.
+  function dragged(event) {
+    event.subject.fx = event.x
+    event.subject.fy = event.y
+  }
+
+  // Restore the target alpha so the simulation cools after dragging ends.
+  // Unfix the subject position now that it’s no longer being dragged.
+  function dragended(event) {
+    if (!event.active) simulation.alphaTarget(0)
+    event.subject.fx = null
+    event.subject.fy = null
+  }
+
+  // When this cell is re-run, stop the previous simulation. (This doesn’t
+  // really matter since the target alpha is zero and the simulation will
+  // stop naturally, but it’s a good practice.)
+  // invalidation.then(() => simulation.stop())
 }
 
 onMounted(() => {
