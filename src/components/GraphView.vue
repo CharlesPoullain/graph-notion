@@ -1,41 +1,43 @@
 <script setup>
 import { onMounted, ref } from 'vue'
 import * as d3 from 'd3'
+import FetchPosts from '../services/FetchPosts.js'
 
 const graph = ref(null)
+const nodes = ref([])
+const links = ref([])
 
-// import FetchPosts from '../services/FetchPosts.js'
-// const data = FetchPosts.execute()
-import data from '../posts.json'
-const nodes = data?.results?.map(page => ({
-  id: page.id,
-  title: page.properties.Name.title[0].plain_text
-}))
+const fetchDatas = async () => {
+  const data = await FetchPosts.execute()
+  // import data from '../posts.json'
+  nodes.value = data?.map((page) => ({
+    id: page.id,
+    title: page.properties.Name.title[0].plain_text
+  }))
 
-const links = []
-
-data?.results?.forEach(page => {
-  const sourceId = page.id
-  const related = page.properties['Related base test'].relation
-  related.forEach(relation => {
-    links.push({
-      source: sourceId,
-      target: relation.id
+  data?.forEach((page) => {
+    const sourceId = page.id
+    const related = page.properties['Related base test'].relation
+    related.forEach((relation) => {
+      links.value.push({
+        source: sourceId,
+        target: relation.id
+      })
     })
   })
-})
 
-// Pour garantir des liens réciproques
-data?.results?.forEach(page => {
-  const targetId = page.id
-  const relatedBack = page.properties['Related back to base test'].relation
-  relatedBack.forEach(relation => {
-    links.push({
-      source: relation.id,
-      target: targetId
+  // Pour garantir des liens réciproques
+  data?.forEach((page) => {
+    const targetId = page.id
+    const relatedBack = page.properties['Related back to base test'].relation
+    relatedBack.forEach((relation) => {
+      links.value.push({
+        source: relation.id,
+        target: targetId
+      })
     })
   })
-})
+}
 
 const createGraph = () => {
   const width = 800
@@ -48,16 +50,19 @@ const createGraph = () => {
 
   // Create a simulation with several forces.
   const simulation = d3
-  .forceSimulation(nodes)
-  .force(
-    'link',
-    d3.forceLink(links).id((d) => d.id).distance(100)
-  )
-  .force('charge', d3.forceManyBody().strength(-300))
-  .force('center', d3.forceCenter(0, 0))
-  .force('collision', d3.forceCollide().radius(50))
-  .force('x', d3.forceX(0).strength(0.1)) 
-  .force('y', d3.forceY(0).strength(0.1))
+    .forceSimulation(nodes.value)
+    .force(
+      'link',
+      d3
+        .forceLink(links.value)
+        .id((d) => d.id)
+        .distance(100)
+    )
+    .force('charge', d3.forceManyBody().strength(-300))
+    .force('center', d3.forceCenter(0, 0))
+    .force('collision', d3.forceCollide().radius(50))
+    .force('x', d3.forceX(0).strength(0.1))
+    .force('y', d3.forceY(0).strength(0.1))
 
   // Create the SVG container.
   const svg = d3
@@ -74,7 +79,7 @@ const createGraph = () => {
     .attr('stroke', '#999')
     .attr('stroke-opacity', 0.4)
     .selectAll('line')
-    .data(links)
+    .data(links.value)
     .join('line')
     .attr('stroke-width', (d) => Math.sqrt(d.value))
 
@@ -83,7 +88,7 @@ const createGraph = () => {
     .attr('stroke', '#fff')
     .attr('stroke-width', 1.5)
     .selectAll('circle')
-    .data(nodes)
+    .data(nodes.value)
     .join('circle')
     .attr('r', 10)
     .attr('fill', (d) => color(d.group))
@@ -92,16 +97,15 @@ const createGraph = () => {
   node.append('title').text((d) => d.id)
 
   const label = svg
-  .append('g')
-  .selectAll('text')
-  .data(nodes)
-  .enter()
-  .append('text')
-  .attr('dy', -3)
-  .attr('dx', 12)
-  .attr('cursor', 'default')
-  .text((d) => d.title)
-
+    .append('g')
+    .selectAll('text')
+    .data(nodes.value)
+    .enter()
+    .append('text')
+    .attr('dy', -3)
+    .attr('dx', 12)
+    .attr('cursor', 'default')
+    .text((d) => d.title)
 
   // Add a drag behavior.
   node.call(d3.drag().on('start', dragstarted).on('drag', dragged).on('end', dragended))
@@ -145,7 +149,8 @@ const createGraph = () => {
   // invalidation.then(() => simulation.stop())
 }
 
-onMounted(() => {
+onMounted(async () => {
+  await fetchDatas()
   createGraph()
 })
 </script>
