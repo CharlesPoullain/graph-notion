@@ -105,6 +105,7 @@ const createGraph = () => {
     .attr('dy', -3)
     .attr('dx', 12)
     .attr('cursor', 'default')
+    .attr('fill', 'white')
     .text((d) => d.title)
 
   // Add a drag behavior.
@@ -158,11 +159,4 @@ onMounted(async () => {
 <template>
   <div id="graph" ref="graph"></div>
 </template>
-<style scoped>
-#graph {
-  border: 1px solid black;
-}
-svg {
-  border: 1px solid black;
-}
-</style>
+<style scoped></style>
